@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Adaptive PE Activity Designer</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/alpinejs@3.13.3/dist/cdn.min.js" defer></script>
+<script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        brand: { 50:'#f0fdf4', 100:'#dcfce7', 200:'#bbf7d0', 300:'#86efac', 400:'#4ade80', 500:'#22c55e', 600:'#16a34a', 700:'#15803d', 800:'#166534', 900:'#14532d' },
+        accent: { 50:'#eff6ff', 100:'#dbeafe', 200:'#bfdbfe', 300:'#93c5fd', 400:'#60a5fa', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8' },
+        warm: { 50:'#fff7ed', 100:'#ffedd5', 200:'#fed7aa', 300:'#fdba74', 400:'#fb923c', 500:'#f97316' }
+      },
+      fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+    }
+  }
+}
+</script>
+<style>
+[x-cloak] { display: none !important; }
+html { font-family: 'Inter', system-ui, sans-serif; }
+body { -webkit-tap-highlight-color: transparent; }
+.fade-in { animation: fadeIn 0.3s ease-in; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.pulse-gentle { animation: pulseGentle 2s infinite; }
+@keyframes pulseGentle { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+.slide-up { animation: slideUp 0.4s ease-out; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+input, select, textarea { font-size: 16px !important; }
+.print-card { page-break-inside: avoid; }
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+}
+.tooltip { position: relative; }
+.tooltip:hover::after {
+  content: attr(data-tip);
+  position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+  background: #1e293b; color: white; padding: 4px 8px; border-radius: 6px;
+  font-size: 12px; white-space: nowrap; z-index: 50;
+}
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+</style>
+</head>
+<body class="bg-gray-50 min-h-screen" x-data="app()" x-init="init()" x-cloak>
+
+<!-- Global Loading Overlay -->
+<div x-show="globalLoading" x-transition class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+  <div class="bg-white rounded-2xl p-8 mx-4 max-w-sm w-full text-center shadow-2xl">
+    <div class="w-16 h-16 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+    <p class="text-lg font-semibold text-gray-800" x-text="loadingMessage">Generating...</p>
+    <p class="text-sm text-gray-500 mt-2" x-text="loadingSubMessage"></p>
+  </div>
+</div>
+
+<!-- Error Toast -->
+<div x-show="errorToast" x-transition class="fixed top-4 left-4 right-4 z-50 bg-red-50 border border-red-200 rounded-xl p-4 shadow-lg max-w-lg mx-auto">
+  <div class="flex items-start gap-3">
+    <span class="text-2xl">⚠️</span>
+    <div class="flex-1">
+      <p class="text-sm font-medium text-red-800" x-text="errorMessage"></p>
+      <button @click="errorToast=false" class="mt-2 text-xs text-red-600 underline">Dismiss</button>
+    </div>
+  </div>
+</div>
+
+<!-- Success Toast -->
+<div x-show="successToast" x-transition class="fixed top-4 left-4 right-4 z-50 bg-brand-50 border border-brand-200 rounded-xl p-4 shadow-lg max-w-lg mx-auto">
+  <div class="flex items-center gap-3">
+    <span class="text-2xl">✅</span>
+    <p class="text-sm font-medium text-brand-800" x-text="successMessage"></p>
+  </div>
+</div>
+
+<!-- Header -->
+<header class="bg-gradient-to-r from-brand-600 via-brand-500 to-accent-500 text-white sticky top-0 z-40 shadow-lg no-print">
+  <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span class="text-2xl">♿🏃</span>
+      <div>
+        <h1 class="text-lg font-bold leading-tight">Adaptive PE Designer</h1>
+        <p class="text-xs text-white/80">IEP-aligned inclusive lessons</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button @click="showStats = !showStats" class="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition" data-tip="AI Stats">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      </button>
+      <button @click="resetAll()" class="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition text-xs font-medium">Reset</button>
+    </div>
+  </div>
+</header>
+
+<!-- Stats Panel -->
+<div x-show="showStats" x-transition class="bg-gray-900 text-gray-300 text-xs p-4 no-print">
+  <div class="max-w-4xl mx-auto grid grid-cols-2 gap-2">
+    <div>📊 Total AI Calls: <span class="text-white font-bold" x-text="aiStats.totalCalls"></span></div>
+    <div>⏱️ Total Time: <span class="text-white font-bold" x-text="(aiStats.totalTime/1000).toFixed(1) + 's'"></span></div>
+    <div>📥 Input Tokens: <span class="text-white font-bold" x-text="aiStats.totalInputTokens"></span></div>
+    <div>📤 Output Tokens: <span class="text-white font-bold" x-text="aiStats.totalOutputTokens"></span></div>
+  </div>
+</div>
+
+<!-- Navigation Tabs -->
+<nav class="bg-white border-b sticky top-[60px] z-30 no-print">
+  <div class="max-w-4xl mx-auto flex overflow-x-auto">
+    <template x-for="tab in tabs" :key="tab.id">
+      <button @click="currentTab = tab.id"
+        :class="currentTab === tab.id ? 'border-brand-500 text-brand-700 bg-brand-50' : 'border-transparent text-gray-500 hover:text-gray-700'"
+        class="flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-all flex items-center gap-1.5 min-h-[48px]">
+        <span x-text="tab.icon"></span>
+        <span x-text="tab.label"></span>
+        <span x-show="tab.id === 'students' && students.length > 0" class="bg-brand-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center" x-text="students.length"></span>
+      </button>
+    </template>
+  </div>
+</nav>
+
+<!-- Main Content -->
+<main class="max-w-4xl mx-auto px-4 py-6 pb-24">
+
+  <!-- TAB: Students -->
+  <div x-show="currentTab === 'students'" class="fade-in space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-bold text-gray-800">👤 Student Profiles</h2>
+      <button @click="openStudentModal()" class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition min-h-[44px] shadow-md">
+        + Add Student
+      </button>
+    </div>
+
+    <!-- Empty State -->
+    <div x-show="students.length === 0" class="text-center py-12 bg-white rounded-2xl border-2 border-dashed border-gray-200">
+      <span class="text-5xl block mb-4">🧑‍🦽</span>
+      <h3 class="text-lg font-semibold text-gray-700">No students yet</h3>
+      <p class="text-gray-500 text-sm mt-1 max-w-xs mx-auto">Add student mobility profiles to get started with personalized lesson plans</p>
+      <button @click="openStudentModal()" class="mt-4 bg-brand-500 text-white px-6 py-2.5 rounded-xl font-medium text-sm">+ Add First Student</button>
+    </div>
+
+    <!-- Student Cards -->
+    <template x-for="(student, idx) in students" :key="student.id">
+      <div class="bg-white rounded-xl shadow-sm border p-4 slide-up">
+        <div class="flex items-start justify-between">
+          <div class="flex-1">
+            <div class="flex items-center gap-2">
+              <span class="text-lg" x-text="getMobilityEmoji(student.mobilityLevel)"></span>
+              <h3 class="font-semibold text-gray-800" x-text="student.name"></h3>
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                :class="{'bg-green-100 text-green-700': student.mobilityLevel === 'mild', 'bg-yellow-100 text-yellow-700': student.mobilityLevel === 'moderate', 'bg-red-100 text-red-700': student.mobilityLevel === 'severe'}"
+                x-text="student.mobilityLevel"></span>
+            </div>
+            <p class="text-sm text-gray-500 mt-1"><strong>Grade:</strong> <span x-text="student.grade"></span> · <strong>Class:</strong> <span x-text="student.className || 'Unassigned'"></span></p>
+            <p class="text-sm text-gray-500"><strong>Mobility:</strong> <span x-text="student.mobilityDescription"></span></p>
+            <div x-show="student.iepGoals" class="mt-2">
+              <p class="text-xs font-medium text-accent-600">🎯 IEP Goals:</p>
+              <p class="text-xs text-gray-600" x-text="student.iepGoals"></p>
+            </div>
+            <div x-show="student.assistiveDevices" class="mt-1">
+              <p class="text-xs text-gray-500">🦽 Devices: <span x-text="student.assistiveDevices"></span></p>
+            </div>
+          </div>
+          <div class="flex gap-1 ml-2">
+            <button @click="editStudent(idx)" class="p-2 text-gray-400 hover:text-accent-500 transition min-w-[44px] min-h-[44px] flex items-center justify-center">✏️</button>
+            <button @click="deleteStudent(idx)" class="p-2 text-gray-400 hover:text-red-500 transition min-w-[44px] min-h-[44px] flex items-center justify-center">🗑️</button>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- TAB: Setup -->
+  <div x-show="currentTab === 'setup'" class="fade-in space-y-4">
+    <h2 class="text-xl font-bold text-gray-800">⚙️ Class & Facility Setup</h2>
+
+    <div class="bg-white rounded-xl shadow-sm border p-4 space-y-4">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">🏫 Class Information</h3>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs font-medium text-gray-600">Class Name</label>
+          <input x-model="classSetup.className" type="text" placeholder="e.g., Period 3 PE" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 min-h-[44px]">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-gray-600">Class Size</label>
+          <input x-model.number="classSetup.classSize" type="number" min="1" max="50" placeholder="25" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 min-h-[44px]">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-gray-600">Duration (min)</label>
+          <input x-model.number="classSetup.duration" type="number" min="10" max="120" placeholder="45" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 min-h-[44px]">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-gray-600">Grade Level</label>
+          <select x-model="classSetup.gradeLevel" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 min-h-[44px]">
+            <option value="">Select...</option>
+            <option value="K-2">K-2</option>
+            <option value="3-5">3-5</option>
+            <option value="6-8">6-8</option>
+            <option value="9-12">9-12</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border p-4 space-y-4">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">📐 Facility & Space</h3>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs font-medium text-gray-600">Space Type</label>
+          <select x-model="classSetup.spaceType" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 min-h-[44px]">
+            <option value="gymnasium">Gymnasium</option>
+            <option value="outdoor_field">Outdoor Field</option>
+            <option value="multipurpose_room">Multipurpose Room</option>
+            <option value="classroom">Classroom</option>
+            <option value="hallway">Hallway/Corridor</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-gray-600">Space Size</label>
+          <select x-model="classSetup.spaceSize" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 min-h-[44px]">
+            <option value="small">Small (&lt;2000 sqft)</option>
+            <option value="medium">Medium (2000-5000 sqft)</option>
+            <option value="large">Large (&gt;5000 sqft)</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-600">Surface Type</label>
+        <select x-model="classSetup.surfaceType" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 min-h-[44px]">
+          <option value="hardwood">Hardwood</option>
+          <option value="rubber">Rubber Mat</option>
+          <option value="grass">Grass</option>
+          <option value="turf">Artificial Turf</option>
+          <option value="concrete">Concrete</option>
+          <option value="carpet">Carpet</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-600">Accessibility Features</label>
+        <div class="mt-1 flex flex-wrap gap-2">
+          <template x-for="feature in accessibilityFeatures" :key="feature">
+            <label class="inline-flex items-center gap-1.5 bg-gray-50 border rounded-lg px-3 py-2 text-xs cursor-pointer hover:bg-brand-50 transition min-h-[40px]">
+              <input type="checkbox" :value="feature" x-model="classSetup.accessFeatures" class="rounded text-brand-500">
+              <span x-text="feature"></span>
+            </label>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border p-4 space-y-4">
+      <h3 class="font-semibold text-gray-700 flex items-center gap-2">🏐 Available Equipment</h3>
+      <p class="text-xs text-gray-500">Check all equipment available for your classes</p>
+      <div class="grid grid-cols-2 gap-2">
+        <template x-for="equip in equipmentList" :key="equip">
+          <label class="inline-flex items-center gap-2 bg-gray-50 border rounded-lg px-3 py-2.5 text-sm cursor-pointer hover:bg-brand-50 transition min-h-[44px]">
+            <input type="checkbox" :value="equip" x-model="classSetup.equipment" class="rounded text-brand-500">
+            <span x-text="equip"></span>
+          </label>
+        </template>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-600">Other Equipment (comma separated)</label>
+        <input x-model="classSetup.otherEquipment" type="text" placeholder="e.g., parachute, scooter boards" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 min-h-[44px]">
+      </div>
+    </div>
+
+    <div class="bg-brand-50 rounded-xl border border-brand-200 p-4">
+      <p class="text-sm text-brand-800">💡 <strong>Tip:</strong> The more details you provide, the better your generated lessons will be tailored to your specific setting!</p>
+    </div>
+  </div>
+
+  <!-- TAB: Generate -->
+  <div x-show="currentTab === 'generate'" class="fade-in space-y-4">
+    <h2 class="text-xl font-bold text-gray-800">✨ Generate Lesson Plan</h2>
+
+    <!-- Readiness Check -->
+    <div class="bg-white rounded-xl shadow-sm border p-4">
+      <h3 class="font-semibold text-gray-700 mb-3">📋 Readiness Checklist</h3>
+      <div class="space-y-2">
+        <div class="flex items-center gap-2">
+          <span x-text="students.length > 0 ? '✅' : '❌'"></span>
+          <span class="text-sm" :class="students.length > 0 ? 'text-green-700' : 'text-red-600'" x-text="students.length > 0 ? students.length + ' student(s) added' : 'No students added yet'"></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span x-text="classSetup.className ? '✅' : '❌'"></span>
+          <span class="text-sm" :class="classSetup.className ? 'text-green-700' : 'text-red-600'" x-text="classSetup.className ? 'Class: ' + classSetup.className : 'Class name not set'"></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span x-text="classSetup.equipment.length > 0 ? '✅' : '⚠️'"></span>
+          <span class="text-sm" :class="classSetup.equipment.length > 0 ? 'text-green-700' : 'text-yellow-600'" x-text="classSetup.equipment.length > 0 ? classSetup.equipment.length + ' equipment items' : 'No equipment selected (optional)'"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Generation Options -->
+    <div class="bg-white rounded-xl shadow-sm border p-4 space-y-4">
+      <h3 class="font-semibold text-gray-700">🎯 Lesson Focus</h3>
+      <div>
+        <label class="text-xs font-medium text-gray-600">Activity Theme</label>
+        <select x-model="genOptions.theme" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 min-h-[44px]">
+          <option value="locomotor">Locomotor Skills</option>
+          <option value="ball_skills">Ball Skills & Hand-Eye</option>
+          <option value="fitness">Fitness & Conditioning</option>
+          <option value="team_games">Team Games & Cooperation</option>
+          <option value="dance_rhythm">Dance & Rhythm</option>
+          <option value="balance_stability">Balance & Stability</option>
+          <option value="aquatics">Aquatics (if pool available)</option>
+          <option value="yoga_mindfulness">Yoga & Mindfulness</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-600">Intensity Level</label>
+        <select x-model="genOptions.intensity" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 min-h-[44px]">
+          <option value="low">Low — Gentle, therapeutic</option>
+          <option value="moderate">Moderate — Active but manageable</option>
+          <option value="high">High — Vigorous with adaptations</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-600">Special Requests (optional)</label>
+        <textarea x-model="genOptions.specialRequests" rows="2" placeholder="e.g., Focus on upper body for wheelchair users, include peer buddy activities..." class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"></textarea>
+      </div>
+    </div>
+
+    <!-- Generate Button -->
+    <button @click="generateLessonPlan()"
+      :disabled="students.length === 0 || globalLoading"
+      :class="students.length === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-gradient-to-r from-brand-500 to-accent-500 hover:from-brand-600 hover:to-accent-600 shadow-lg hover:shadow-xl'"
+      class="w-full text-white py-4 rounded-xl font-bold text-lg transition-all min-h-[56px]">
+      <span x-show="!globalLoading">✨ Generate Adaptive Lesson Plan</span>
+      <span x-show="globalLoading" class="flex items-center justify-center gap-2">
+        <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        Generating...
+      </span>
+    </button>
+
+    <p x-show="students.length === 0" class="text-center text-sm text-red-500">⬆️ Please add at least one student profile first</p>
+  </div>
+
+  <!-- TAB: Lessons -->
+  <div x-show="currentTab === 'lessons'" class="fade-in space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-bold text-gray-800">📝 Lesson Plans</h2>
+      <span class="text-sm text-gray-500" x-text="lessonPlans.length + ' plan(s)'"></span>
+    </div>
+
+    <div x-show="lessonPlans.length === 0" class="text-center py-12 bg-white rounded-2xl border-2 border-dashed border-gray-200">
+      <span class="text-5xl block mb-4">📋</span>
+      <h3 class="text-lg font-semibold text-gray-700">No lesson plans yet</h3>
+      <p class="text-gray-500 text-sm mt-1">Go to the Generate tab to create your first plan!</p>
+      <button @click="currentTab = 'generate'" class="mt-4 bg-brand-500 text-white px-6 py-2.5 rounded-xl font-medium text-sm">Go to Generate →</button>
+    </div>
+
+    <template x-for="(plan, planIdx) in lessonPlans" :key="plan.id">
+      <div class="bg-white rounded-xl shadow-sm border overflow-hidden slide-up">
+        <div class="bg-gradient-to-r from-brand-500 to-accent-500 text-white p-4">
+          <div class="flex items-start justify-between">
+            <div>
+              <h3 class="font-bold text-lg" x-text="plan.title"></h3>
+              <p class="text-white/80 text-sm" x-text="plan.theme + ' · ' + plan.duration + ' min · ' + plan.date"></p>
+            </div>
+            <div class="flex gap-1">
+              <button @click="showCueCard(planIdx)" class="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition min-w-[44px] min-h-[44px] flex items-center justify-center" title="Cue Card">🃏</button>
+              <button @click="deleteLessonPlan(planIdx)" class="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition min-w-[44px] min-h-[44px] flex items-center justify-center" title="Delete">🗑️</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Safety Alert -->
+        <div x-show="plan.safetyAlerts && plan.safetyAlerts.length > 0" class="bg-red-50 border-b border-red-100 px-4 py-2">
+          <p class="text-xs font-semibold text-red-700">⚠️ Safety Alerts:</p>
+          <template x-for="alert in plan.safetyAlerts" :key="alert">
+            <p class="text-xs text-red-600" x-text="'• ' + alert"></p>
+          </template>
+        </div>
+
+        <div class="p-4 space-y-4">
+          <!-- Warm Up -->
+          <div x-show="plan.warmUp">
+            <h4 class="text-sm font-bold text-brand-700 flex items-center gap-1">🔥 Warm-Up <span class="font-normal text-gray-500" x-text="'(' + (plan.warmUp?.duration || '') + ' min)'"></span></h4>
+            <p class="text-sm text-gray-700 mt-1" x-text="plan.warmUp?.activity"></p>
+            <div x-show="plan.warmUp?.adaptations" class="mt-1 bg-yellow-50 rounded-lg p-2">
+              <p class="text-xs font-medium text-yellow-800">♿ Adaptations:</p>
+              <p class="text-xs text-yellow-700" x-text="plan.warmUp?.adaptations"></p>
+            </div>
+          </div>
+
+          <!-- Main Activities -->
+          <div>
+            <h4 class="text-sm font-bold text-accent-700">🎯 Main Activities</h4>
+            <template x-for="(act, actIdx) in plan.activities" :key="actIdx">
+              <div class="mt-2 bg-gray-50 rounded-lg p-3">
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <p class="text-sm font-semibold text-gray-800" x-text="(actIdx+1) + '. ' + act.name"></p>
+                    <p class="text-xs text-gray-500" x-text="act.duration + ' min · ' + act.intensity + ' intensity'"></p>
+                  </div>
+                  <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                    :class="{'bg-green-100 text-green-700': act.fallRisk === 'low', 'bg-yellow-100 text-yellow-700': act.fallRisk === 'moderate', 'bg-red-100 text-red-700': act.fallRisk === 'high'}"
+                    x-text="'Fall risk: ' + act.fallRisk"></span>
+                </div>
+                <p class="text-xs text-gray-600 mt-1" x-text="act.description"></p>
+                <div x-show="act.adaptations" class="mt-2 bg-yellow-50 rounded p-2">
+                  <p class="text-xs font-medium text-yellow-800">♿ Adaptations by Student:</p>
+                  <template x-for="(adapt, key) in act.adaptations" :key="key">
+                    <p class="text-xs text-yellow-700" x-text="'• ' + key + ': ' + adapt"></p>
+                  </template>
+                </div>
+                <div x-show="act.equipment && act.equipment.length > 0" class="mt-1">
+                  <p class="text-xs text-gray-500">🏐 Equipment: <span x-text="act.equipment?.join(', ')"></span></p>
+                </div>
+                <div x-show="act.iepAlignment" class="mt-1">
+                  <p class="text-xs text-accent-600">📎 IEP Alignment: <span x-text="act.iepAlignment"></span></p>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Cool Down -->
+          <div x-show="plan.coolDown">
+            <h4 class="text-sm font-bold text-brand-700 flex items-center gap-1">❄️ Cool-Down <span class="font-normal text-gray-500" x-text="'(' + (plan.coolDown?.duration || '') + ' min)'"></span></h4>
+            <p class="text-sm text-gray-700 mt-1" x-text="plan.coolDown?.activity"></p>
+            <div x-show="plan.coolDown?.adaptations" class="mt-1 bg-yellow-50 rounded-lg p-2">
+              <p class="text-xs font-medium text-yellow-800">♿ Adaptations:</p>
+              <p class="text-xs text-yellow-700" x-text="plan.coolDown?.adaptations"></p>
+            </div>
+          </div>
+
+          <!-- Assistive Devices -->
+          <div x-show="plan.assistiveDevices && plan.assistiveDevices.length > 0" class="bg-accent-50 rounded-lg p-3">
+            <h4 class="text-xs font-bold text-accent-700">🦽 Recommended Assistive Devices</h4>
+            <template x-for="device in plan.assistiveDevices" :key="device">
+              <p class="text-xs text-accent-600" x-text="'• ' + device"></p>
+            </template>
+          </div>
+
+          <!-- Progression -->
+          <div x-show="plan.progressionTrack" class="bg-brand-50 rounded-lg p-3">
+            <h4 class="text-xs font-bold text-brand-700">📈 Progression Track</h4>
+            <p class="text-xs text-brand-600" x-text="plan.progressionTrack"></p>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- TAB: Rubrics -->
+  <div x-show="currentTab === 'rubrics'" class="fade-in space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-bold text-gray-800">📊 Assessment Rubrics</h2>
+      <button x-show="lessonPlans.length > 0" @click="generateRubric()" :disabled="globalLoading"
+        class="bg-accent-500 hover:bg-accent-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition min-h-[44px] shadow-md disabled:opacity-50">
+        🔄 Generate Rubric
+      </button>
+    </div>
+
+    <div x-show="!currentRubric && lessonPlans.length === 0" class="text-center py-12 bg-white rounded-2xl border-2 border-dashed border-gray-200">
+      <span class="text-5xl block mb-4">📊</span>
+      <h3 class="text-lg font-semibold text-gray-700">No rubrics yet</h3>
+      <p class="text-gray-500 text-sm mt-1">Generate a lesson plan first, then create assessment rubrics</p>
+    </div>
+
+    <div x-show="currentRubric" class="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <div class="bg-gradient-to-r from-warm-400 to-warm-500 text-white p-4">
+        <h3 class="font-bold" x-text="currentRubric?.title || 'Assessment Rubric'"></h3>
+        <p class="text-white/80 text-sm" x-text="'Aligned to IEP metrics · ' + (currentRubric?.studentCount || 0) + ' students'"></p>
+      </div>
+      <div class="p-4 space-y-3 overflow-x-auto">
+        <template x-for="(criterion, cIdx) in (currentRubric?.criteria || [])" :key="cIdx">
+          <div class="border rounded-lg p-3">
+            <h4 class="font-semibold text-sm text-gray-800" x-text="criterion.name"></h4>
+            <p class="text-xs text-gray-500 mb-2" x-text="criterion.iepGoal"></p>
+            <div class="grid grid-cols-4 gap-1 text-xs">
+              <div class="bg-red-50 rounded p-2 text-center">
+                <p class="font-bold text-red-700">1</p>
+                <p class="text-red-600" x-text="criterion.level1"></p>
+              </div>
+              <div class="bg-yellow-50 rounded p-2 text-center">
+                <p class="font-bold text-yellow-700">2</p>
+                <p class="text-yellow-600" x-text="criterion.level2"></p>
+              </div>
+              <div class="bg-green-50 rounded p-2 text-center">
+                <p class="font-bold text-green-700">3</p>
+                <p class="text-green-600" x-text="criterion.level3"></p>
+              </div>
+              <div class="bg-brand-50 rounded p-2 text-center">
+                <p class="font-bold text-brand-700">4</p>
+                <p class="text-brand-600" x-text="criterion.level4"></p>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: Schedule -->
+  <div x-show="currentTab === 'schedule'" class="fade-in space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-bold text-gray-800">📅 Equipment Schedule</h2>
+      <button x-show="lessonPlans.length > 0" @click="generateSchedule()" :disabled="globalLoading"
+        class="bg-warm-500 hover:bg-warm-400 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition min-h-[44px] shadow-md disabled:opacity-50">
+        🔄 Optimize Schedule
+      </button>
+    </div>
+
+    <div x-show="!equipmentSchedule" class="text-center py-12 bg-white rounded-2xl border-2 border-dashed border-gray-200">
+      <span class="text-5xl block mb-4">📅</span>
+      <h3 class="text-lg font-semibold text-gray-700">No schedule yet</h3>
+      <p class="text-gray-500 text-sm mt-1">Generate lesson plans first, then optimize equipment sharing across classes</p>
+    </div>
+
+    <div x-show="equipmentSchedule" class="space-y-3">
+      <template x-for="(day, dIdx) in (equipmentSchedule?.days || [])" :key="dIdx">
+        <div class="bg-white rounded-xl shadow-sm border p-4">
+          <h3 class="font-bold text-gray-800 flex items-center gap-2">
+            <span>📆</span>
+            <span x-text="day.name"></span>
+          </h3>
+          <template x-for="(slot, sIdx) in day.slots" :key="sIdx">
+            <div class="mt-2 bg-gray-50 rounded-lg p-3 flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium text-gray-700" x-text="slot.time + ' — ' + slot.className"></p>
+                <p class="text-xs text-gray-500" x-text="'Equipment: ' + slot.equipment?.join(', ')"></p>
+              </div>
+              <span class="text-xs px-2 py-1 rounded-full bg-brand-100 text-brand-700" x-text="slot.activity"></span>
+            </div>
+          </template>
+        </div>
+      </template>
+      <div x-show="equipmentSchedule?.tips" class="bg-accent-50 rounded-xl border border-accent-200 p-4">
+        <h4 class="text-sm font-bold text-accent-700">💡 Optimization Tips</h4>
+        <template x-for="tip in (equipmentSchedule?.tips || [])" :key="tip">
+          <p class="text-xs text-accent-600 mt-1" x-text="'• ' + tip"></p>
+        </template>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Student Modal -->
+<div x-show="showStudentModal" x-transition class="fixed inset-0 z-50 flex items-end sm:items-center justify-center no-print">
+  <div class="fixed inset-0 bg-black/50" @click="showStudentModal = false"></div>
+  <div class="relative bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div class="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between rounded-t-2xl z-10">
+      <h3 class="font-bold text-lg" x-text="editingStudentIdx !== null ? 'Edit Student' : 'Add Student'"></h3>
+      <button @click="showStudentModal = false" class="p-2 hover:bg-gray-100 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center text-xl">✕</button>
+    </div>
+    <div class="p-4 space-y-4">
+      <div>
+        <label class="text-xs font-medium text-gray-600">Student Name *</label>
+        <input x-model="studentForm.name" type="text" placeholder="e.g., Alex M." class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 min-h-[44px]">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs font-medium text-gray-600">Grade</label>
+          <input x-model="studentForm.grade" type="text" placeholder="e.g., 5th" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 min-h-[44px]">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-gray-600">Class</label>
+          <input x-model="studentForm.className" type="text" placeholder="e.g., Period 3" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 min-h-[44px]">
+        </div>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-600">Mobility Level *</label>
+        <select x-model="studentForm.mobilityLevel" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 min-h-[44px]">
+          <option value="">Select level...</option>
+          <option value="mild">Mild — Can walk/run with minor limitations</option>
+          <option value="moderate">Moderate — Needs assistive devices for mobility</option>
+          <option value="severe">Severe — Wheelchair user or significant support needed</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-600">Mobility Description *</label>
+        <textarea x-model="studentForm.mobilityDescription" rows="2" placeholder="e.g., Uses manual wheelchair, good upper body strength, limited trunk stability..." class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500"></textarea>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-600">IEP Goals</label>
+        <textarea x-model="studentForm.iepGoals" rows="2" placeholder="e.g., Improve upper body endurance, participate in team activities for 15+ min..." class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500"></textarea>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-600">Assistive Devices</label>
+        <input x-model="studentForm.assistiveDevices" type="text" placeholder="e.g., Manual wheelchair, AFOs, walker" class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 min-h-[44px]">
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-600">Medical Notes</label>
+        <textarea x-model="studentForm.medicalNotes" rows="2" placeholder="e.g., Seizure disorder — avoid flashing lights; low bone density..." class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500"></textarea>
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-600">Therapy Notes</label>
+        <textarea x-model="studentForm.therapyNotes" rows="2" placeholder="e.g., PT working on standing balance; OT focus on grip strength..." class="w-full mt-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500"></textarea>
+      </div>
+      <button @click="saveStudent()" class="w-full bg-brand-500 hover:bg-brand-600 text-white py-3 rounded-xl font-bold transition min-h-[48px]" x-text="editingStudentIdx !== null ? 'Update Student' : 'Add Student'"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Cue Card Modal -->
+<div x-show="showCueCardModal" x-transition class="fixed inset-0 z-50 flex items-end sm:items-center justify-center no-print">
+  <div class="fixed inset-0 bg-black/50" @click="showCueCardModal = false"></div>
+  <div class="relative bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div class="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between rounded-t-2xl z-10">
+      <h3 class="font-bold text-lg">🃏 Teacher Cue Card</h3>
+      <div class="flex gap-2">
+        <button @click="printCueCard()" class="text-sm bg-brand-500 text-white px-3 py-1.5 rounded-lg">🖨️ Print</button>
+        <button @click="showCueCardModal = false" class="p-2 hover:bg-gray-100 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center text-xl">✕</button>
+      </div>
+    </div>
+    <div id="cue-card-content" class="p-4 space-y-3" x-show="cueCardData">
+      <div class="bg-brand-50 rounded-lg p-3 text-center">
+        <h4 class="font-bold text-brand-800 text-lg" x-text="cueCardData?.title"></h4>
+        <p class="text-sm text-brand-600" x-text="cueCardData?.theme + ' · ' + cueCardData?.duration + ' min'"></p>
+      </div>
+      <div class="bg-red-50 rounded-lg p-3">
+        <h5 class="font-bold text-red-700 text-sm">⚠️ SAFETY FIRST</h5>
+        <template x-for="alert in (cueCardData?.safetyAlerts || [])" :key="alert">
+          <p class="text-xs text-red-600" x-text="'• ' + alert"></p>
+        </template>
+      </div>
+      <div class="border rounded-lg p-3">
+        <h5 class="font-bold text-sm text-gray-800">🔥 Warm-Up (<span x-text="cueCardData?.warmUp?.duration"></span> min)</h5>
+        <p class="text-xs text-gray-600" x-text="cueCardData?.warmUp?.activity"></p>
+      </div>
+      <template x-for="(act, i) in (cueCardData?.activities || [])" :key="i">
+        <div class="border rounded-lg p-3">
+          <h5 class="font-bold text-sm text-gray-800" x-text="'🎯 ' + act.name + ' (' + act.duration + ' min)'"></h5>
+          <p class="text-xs text-gray-600" x-text="act.description"></p>
+          <p class="text-xs text-yellow-700 mt-1 font-medium" x-show="act.adaptations">♿ Adaptations: See lesson plan for details</p>
+        </div>
+      </template>
+      <div class="border rounded-lg p-3">
+        <h5 class="font-bold text-sm text-gray-800">❄️ Cool-Down (<span x-text="cueCardData?.coolDown?.duration"></span> min)</h5>
+        <p class="text-xs text-gray-600" x-text="cueCardData?.coolDown?.activity"></p>
+      </div>
+      <div class="bg-accent-50 rounded-lg p-3">
+        <h5 class="font-bold text-sm text-accent-700">🏐 Equipment Needed</h5>
+        <p class="text-xs text-accent-600" x-text="cueCardData?.equipmentNeeded?.join(', ') || 'None specified'"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Global AI tracking variables
+window.aiStats = {
+  totalCalls: 0,
+  totalTime: 0,
+  totalInputTokens: 0,
+  totalOutputTokens: 0,
+  aliasTimes: {}
+};
+
+async function callAI(alias, params, retries = 3) {
+  const start = Date.now();
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const resp = await fetch('https://16504442930.work/run_prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alias, params })
+      });
+      if (!resp.ok) {
+        const errText = await resp.text();
+        if (attempt === retries - 1) {
+          // Reformat error with AI
+          try {
+            const errResp = await fetch('https://16504442930.work/run_prompt', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                alias: 'genericAI',
+                params: {
+                  prompt: `Reformat this API error message to be user-friendly and empowering, helping the user fix the issue. Include the full original error. Return JSON with key "userMessage" as a string. Original error: ${errText}`
+                }
+              })
+            });
+            if (errResp.ok) {
+              const errData = await errResp.json();
+              throw new Error(errData.userMessage || errText);
+            }
+          } catch(e2) {
+            if (e2.message !== errText) throw e2;
+          }
+          throw new Error(`API Error (${resp.status}): ${errText}`);
+        }
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        continue;
+      }
+      const data = await resp.json();
+      const elapsed = Date.now() - start;
+      window.aiStats.totalCalls++;
+      window.aiStats.totalTime += elapsed;
+      window.aiStats.totalInputTokens += (data.input_tokens || data.usage?.input_tokens || 0);
+      window.aiStats.totalOutputTokens += (data.output_tokens || data.usage?.output_tokens || 0);
+      if (!window.aiStats.aliasTimes[alias]) window.aiStats.aliasTimes[alias] = 0;
+      window.aiStats.aliasTimes[alias] += elapsed;
+      return data;
+    } catch (err) {
+      if (attempt === retries - 1) throw err;
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
+}
+
+function app() {
+  return {
+    currentTab: 'students',
+    tabs: [
+      { id: 'students', label: 'Students', icon: '👤' },
+      { id: 'setup', label: 'Setup', icon: '⚙️' },
+      { id: 'generate', label: 'Generate', icon: '✨' },
+      { id: 'lessons', label: 'Lessons', icon: '📝' },
+      { id: 'rubrics', label: 'Rubrics', icon: '📊' },
+      { id: 'schedule', label: 'Schedule', icon: '📅' }
+    ],
+    globalLoading: false,
+    loadingMessage: 'Generating...',
+    loadingSubMessage: '',
+    errorToast: false,
+    errorMessage: '',
+    successToast: false,
+    successMessage: '',
+    showStats: false,
+    showStudentModal: false,
+    showCueCardModal: false,
+    editingStudentIdx: null,
+
+    students: [],
+    classSetup: {
+      className: '',
+      classSize: 25,
+      duration: 45,
+      gradeLevel: '',
+      spaceType: 'gymnasium',
+      spaceSize: 'medium',
+      surfaceType: 'hardwood',
+      accessFeatures: [],
+      equipment: [],
+      otherEquipment: ''
+    },
+    genOptions: {
+      theme: 'locomotor',
+      intensity: 'moderate',
+      specialRequests: ''
+    },
+    studentForm: {},
+    lessonPlans: [],
+    currentRubric: null,
+    equipmentSchedule: null,
+    cueCardData: null,
+
+    accessibilityFeatures: ['Wheelchair ramps', 'Wide doorways', 'Handrails', 'Non-slip flooring', 'Sensory room nearby', 'Accessible restrooms', 'Elevator access'],
+    equipmentList: ['Wheelchairs (sport)', 'Foam balls', 'Beanbags', 'Cones/Markers', 'Parachute', 'Resistance bands', 'Scooter boards', 'Balance boards', 'Yoga mats', 'Beach balls', 'Bowling set (adapted)', 'Bocce ball set', 'Hand weights (light)', 'Therapy balls', 'Jump ropes', 'Hula hoops', 'Floor spots/markers', 'Nets (adjustable height)'],
+
+    get aiStats() { return window.aiStats; },
+
+    init() {
+      const saved = localStorage.getItem('adaptivePE');
+      if (saved) {
+        try {
+          const data = JSON.parse(saved);
+          this.students = data.students || [];
+          this.classSetup = { ...this.classSetup, ...(data.classSetup || {}) };
+          this.lessonPlans = data.lessonPlans || [];
+          this.currentRubric = data.currentRubric || null;
+          this.equipmentSchedule = data.equipmentSchedule || null;
+        } catch(e) { console.error('Load error', e); }
+      }
+      this.resetStudentForm();
+      this.$watch('students', () => this.save());
+      this.$watch('classSetup', () => this.save(), { deep: true });
+      this.$watch('lessonPlans', () => this.save());
+      this.$watch('currentRubric', () => this.save());
+      this.$watch('equipmentSchedule', () => this.save());
+    },
+
+    save() {
+      localStorage.setItem('adaptivePE', JSON.stringify({
+        students: this.students,
+        classSetup: this.classSetup,
+        lessonPlans: this.lessonPlans,
+        currentRubric: this.currentRubric,
+        equipmentSchedule: this.equipmentSchedule
+      }));
+    },
+
+    resetAll() {
+      if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
+        localStorage.removeItem('adaptivePE');
+        this.students = [];
+        this.classSetup = {
+          className: '', classSize: 25, duration: 45, gradeLevel: '',
+          spaceType: 'gymnasium', spaceSize: 'medium', surfaceType: 'hardwood',
+          accessFeatures: [], equipment: [], otherEquipment: ''
+        };
+        this.lessonPlans = [];
+        this.currentRubric = null;
+        this.equipmentSchedule = null;
+        this.currentTab = 'students';
+        this.showSuccess('All data has been reset!');
+      }
+    },
+
+    resetStudentForm() {
+      this.studentForm = {
+        name: '', grade: '', className: '', mobilityLevel: '',
+        mobilityDescription: '', iepGoals: '', assistiveDevices: '',
+        medicalNotes: '', therapyNotes: ''
+      };
+    },
+
+    openStudentModal() {
+      this.editingStudentIdx = null;
+      this.resetStudentForm();
+      this.showStudentModal = true;
+    },
+
+    editStudent(idx) {
+      this.editingStudentIdx = idx;
+      this.studentForm = { ...this.students[idx] };
+      this.showStudentModal = true;
+    },
+
+    saveStudent() {
+      if (!this.studentForm.name || !this.studentForm.mobilityLevel || !this.studentForm.mobilityDescription) {
+        this.showError('Please fill in the required fields: Name, Mobility Level, and Mobility Description.');
+        return;
+      }
+      if (this.editingStudentIdx !== null) {
+        this.students[this.editingStudentIdx] = { ...this.studentForm, id: this.students[this.editingStudentIdx].id };
+        this.students = [...this.students]; // trigger reactivity
+        this.showSuccess('Student updated! ✏️');
+      } else {
+        this.students.push({ ...this.studentForm, id: Date.now().toString() });
+        this.students = [...this.students];
+        this.showSuccess('Student added! 🎉');
+      }
+      this.showStudentModal = false;
+      this.resetStudentForm();
+    },
+
+    deleteStudent(idx) {
+      if (confirm('Remove ' + this.students[idx].name + '?')) {
+        this.students.splice(idx, 1);
+        this.students = [...this.students];
+        this.showSuccess('Student removed.');
+      }
+    },
+
+    getMobilityEmoji(level) {
+      return { mild: '🚶', moderate: '🦯', severe: '🧑‍🦽' }[level] || '👤';
+    },
+
+    async generateLessonPlan() {
+      if (this.students.length === 0) return;
+      this.globalLoading = true;
+      this.loadingMessage = '✨ Designing your adaptive lesson...';
+      this.loadingSubMessage = 'Analyzing student profiles, simulating safety, optimizing activities...';
+
+      try {
+        const studentProfiles = this.students.map(s => ({
+          name: s.name,
+          grade: s.grade,
+          mobilityLevel: s.mobilityLevel,
+          mobilityDescription: s.mobilityDescription,
+          iepGoals: s.iepGoals,
+          assistiveDevices: s.assistiveDevices,
+          medicalNotes: s.medicalNotes,
+          therapyNotes: s.therapyNotes
+        }));
+
+        const allEquipment = [...this.classSetup.equipment];
+        if (this.classSetup.otherEquipment) {
+          allEquipment.push(...this.classSetup.otherEquipment.split(',').map(e => e.trim()).filter(Boolean));
+        }
+
+        const prompt = `You are an expert Adapted Physical Education specialist and biomechanics consultant. Design a complete, inclusive PE lesson plan based on the following inputs.
+
+STUDENT PROFILES:
+${JSON.stringify(studentProfiles, null, 2)}
+
+CLASS SETUP:
+- Class Name: ${this.classSetup.className || 'PE Class'}
+- Class Size: ${this.classSetup.classSize} students
+- Duration: ${this.classSetup.duration} minutes
+- Grade Level: ${this.classSetup.gradeLevel || 'Mixed'}
+- Space: ${this.classSetup.spaceType}, ${this.classSetup.spaceSize} size
+- Surface: ${this.classSetup.surfaceType}
+- Accessibility Features: ${this.classSetup.accessFeatures.join(', ') || 'None specified'}
+- Available Equipment: ${allEquipment.join(', ') || 'Basic gym equipment'}
+
+LESSON PREFERENCES:
+- Theme: ${this.genOptions.theme}
+- Intensity: ${this.genOptions.intensity}
+- Special Requests: ${this.genOptions.specialRequests || 'None'}
+
+IMPORTANT REQUIREMENTS:
+1. Design activities that are inclusive - all students participate meaningfully together, not separately
+2. Provide specific adaptations for EACH student with mobility impairments by name
+3. Assess fall risk for each activity based on the surface type and student mobility profiles
+4. Align activities to students' IEP goals where specified
+5. Suggest assistive devices that would enhance participation
+6. Include a progression track for advancing skills over time
+7. Include safety alerts for any medical concerns mentioned in student profiles
+8. The total time of warmUp + all activities + coolDown must equal ${this.classSetup.duration} minutes
+
+Return your response as a JSON object with EXACTLY this structure:
+{
+  "title": string (creative lesson title),
+  "theme": string (the activity theme),
+  "duration": number (total minutes),
+  "safetyAlerts": string[] (array of critical safety notes based on medical/therapy notes),
+  "warmUp": {
+    "activity": string (description of warm-up),
+    "duration": number (minutes),
+    "adaptations": string (mobility adaptations for warm-up)
+  },
+  "activities": [
+    {
+      "name": string (activity name),
+      "description": string (detailed instructions),
+      "duration": number (minutes),
+      "intensity": string ("low" or "moderate" or "high"),
+      "fallRisk": string ("low" or "moderate" or "high"),
+      "equipment": string[] (equipment needed),
+      "adaptations": object (keys are student names as strings, values are specific adaptation descriptions as strings),
+      "iepAlignment": string (which IEP goals this addresses)
+    }
+  ] (array of 2-4 main activities),
+  "coolDown": {
+    "activity": string (description),
+    "duration": number (minutes),
+    "adaptations": string (mobility adaptations)
+  },
+  "assistiveDevices": string[] (recommended devices),
+  "progressionTrack": string (how to advance these skills over 4-6 weeks),
+  "equipmentNeeded": string[] (all equipment for the lesson)
+}`;
+
+        const data = await callAI('genericAI', { prompt });
+
+        const plan = {
+          id: Date.now().toString(),
+          date: new Date().toLocaleDateString(),
+          ...data
+        };
+
+        this.lessonPlans.unshift(plan);
+        this.lessonPlans = [...this.lessonPlans];
+        this.currentTab = 'lessons';
+        this.showSuccess('Lesson plan generated! 🎉 Check the Lessons tab.');
+      } catch (err) {
+        this.showError('Failed to generate lesson plan: ' + err.message);
+      } finally {
+        this.globalLoading = false;
+      }
+    },
+
+    showCueCard(planIdx) {
+      this.cueCardData = this.lessonPlans[planIdx];
+      this.showCueCardModal = true;
+    },
+
+    printCueCard() {
+      window.print();
+    },
+
+    deleteLessonPlan(idx) {
+      if (confirm('Delete this lesson plan?')) {
+        this.lessonPlans.splice(idx, 1);
+        this.lessonPlans = [...this.lessonPlans];
+        this.showSuccess('Lesson plan deleted.');
+      }
+    },
+
+    async generateRubric() {
+      if (this.lessonPlans.length === 0) return;
+      this.globalLoading = true;
+      this.loadingMessage = '📊 Creating assessment rubric...';
+      this.loadingSubMessage = 'Aligning to IEP metrics and student profiles...';
+
+      try {
+        const latestPlan = this.lessonPlans[0];
+        const studentGoals = this.students.map(s => ({
+          name: s.name,
+          iepGoals: s.iepGoals,
+          mobilityLevel: s.mobilityLevel
+        }));
+
+        const prompt = `You are an expert in adaptive physical education assessment. Create an IEP-aligned assessment rubric for the following lesson plan and students.
+
+LESSON: ${latestPlan.title}
+THEME: ${latestPlan.theme}
+ACTIVITIES: ${latestPlan.activities?.map(a => a.name).join(', ')}
+
+STUDENTS AND IEP GOALS:
+${JSON.stringify(studentGoals, null, 2)}
+
+Create a rubric with 4-6 assessment criteria that align with the students' IEP goals and the lesson activities. Each criterion should have 4 performance levels (1=emerging, 2=developing, 3=proficient, 4=exemplary) with descriptions adapted for students with mobility impairments.
+
+Return JSON with EXACTLY this structure:
+{
+  "title": string (rubric title),
+  "studentCount": number (number of students),
+  "criteria": [
+    {
+      "name": string (criterion name),
+      "iepGoal": string (which IEP goal this maps to),
+      "level1": string (emerging - brief description),
+      "level2": string (developing - brief description),
+      "level3": string (proficient - brief description),
+      "level4": string (exemplary - brief description)
+    }
+  ] (array of 4-6 criteria objects)
+}`;
+
+        const data = await callAI('genericAI', { prompt });
+        this.currentRubric = data;
+        this.showSuccess('Rubric generated! 📊');
+      } catch (err) {
+        this.showError('Failed to generate rubric: ' + err.message);
+      } finally {
+        this.globalLoading = false;
+      }
+    },
+
+    async generateSchedule() {
+      if (this.lessonPlans.length === 0) return;
+      this.globalLoading = true;
+      this.loadingMessage = '📅 Optimizing equipment schedule...';
+      this.loadingSubMessage = 'Solving multi-class equipment sharing constraints...';
+
+      try {
+        const equipmentUsed = [...new Set(this.lessonPlans.flatMap(p => p.equipmentNeeded || []))];
+        const classInfo = {
+          className: this.classSetup.className || 'PE Class',
+          duration: this.classSetup.duration,
+          equipment: equipmentUsed
+        };
+
+        const prompt = `You are an expert in physical education scheduling and equipment logistics optimization. Create an optimized weekly equipment-sharing schedule for adaptive PE classes.
+
+CLASS INFO:
+${JSON.stringify(classInfo, null, 2)}
+
+AVAILABLE EQUIPMENT: ${this.classSetup.equipment.join(', ') || 'Standard gym equipment'}
+LESSON PLANS: ${this.lessonPlans.map(p => p.title + ' (needs: ' + (p.equipmentNeeded || []).join(', ') + ')').join('; ')}
+
+Create a 5-day schedule that optimizes equipment sharing, minimizes setup time between classes, and ensures adaptive equipment is always available when needed. Include practical tips.
+
+Return JSON with EXACTLY this structure:
+{
+  "days": [
+    {
+      "name": string (e.g., "Monday"),
+      "slots": [
+        {
+          "time": string (e.g., "9:00 AM"),
+          "className": string (class name),
+          "activity": string (activity name),
+          "equipment": string[] (equipment for this slot)
+        }
+      ] (array of 2-4 time slot objects)
+    }
+  ] (array of exactly 5 day objects for Monday through Friday),
+  "tips": string[] (array of 3-5 optimization tips as strings)
+}`;
+
+        const data = await callAI('genericAI', { prompt });
+        this.equipmentSchedule = data;
+        this.showSuccess('Schedule optimized! 📅');
+      } catch (err) {
+        this.showError('Failed to generate schedule: ' + err.message);
+      } finally {
+        this.globalLoading = false;
+      }
+    },
+
+    showError(msg) {
+      this.errorMessage = msg;
+      this.errorToast = true;
+      setTimeout(() => this.errorToast = false, 6000);
+    },
+
+    showSuccess(msg) {
+      this.successMessage = msg;
+      this.successToast = true;
+      setTimeout(() => this.successToast = false, 3000);
+    }
+  };
+}
+</script>
+
+</body>
+</html>
